@@ -39,4 +39,6 @@ class Video extends Model
 
     protected $table = 'video';
 
+    protected $primaryKey = 'video_id';
+
 }

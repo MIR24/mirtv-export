@@ -3,6 +3,9 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
+use App\Jobs\ExportImage;
+use App\Video;
 
 class ExportOneSerie extends Command
 {
@@ -37,6 +40,10 @@ class ExportOneSerie extends Command
      */
     public function handle()
     {
-        //
+        Log::debug("Launch One Serie export");
+        Log::info("Exporting Serie",["id"=>$this->argument("videoId")]);
+
+        $video = Video::find($this->argument("videoId"));
+        dispatch(new ExportImage($video));
     }
 }
