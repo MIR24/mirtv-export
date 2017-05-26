@@ -4,21 +4,21 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 
-class ExportSeries extends Command
+class ExportOneSerie extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = '24export:series';
+    protected $signature = '24export:oneserie {videoId}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Launches programm series export procedure from mirtv site into mir24';
+    protected $description = 'Export particular programm serie from mirtv site into mir24';
 
     /**
      * Create a new command instance.
