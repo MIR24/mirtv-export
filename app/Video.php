@@ -42,5 +42,4 @@ class Video extends Model
     protected $primaryKey = 'video_id';
 
     public $timestamps  = false;
-
 }
