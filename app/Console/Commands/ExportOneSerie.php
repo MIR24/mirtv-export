@@ -53,11 +53,14 @@ class ExportOneSerie extends Command
         $api24token = config("24api.params.token");
         $newsCreatePoint = config("24api.url.news.create");
         $video = Video::find($this->argument("videoId"));
+        $exportStatus = config("mirtv.24exportstatus");
 
         if(!$video) {
             Log::error("Episode not found", [$video]);
             return;
         }
+
+        $video->update(["export_status"=>$exportStatus["exporting"]]);
 
         $videoFilePath = config("platformcraft.localvideopath") . $video->video_id . "/" . $video->video;
         $imageFilePath = config("mirtv.localvideopath") . $video->video_id . "/" . $video->image;
@@ -166,6 +169,7 @@ class ExportOneSerie extends Command
         $newsCreateResult = json_decode($newsCreated->getBody()->getContents(),1);
         Log::debug("News created..", $newsCreateResult);
 
+        $video->update(["export_status" => $exportStatus["done"]]);
         $this->info("Done.");
     }
 }
