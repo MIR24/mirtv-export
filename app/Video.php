@@ -35,10 +35,11 @@ class Video extends Model
     /**
      * @var array
      */
-    protected $fillable = ['article_broadcast_id', 'title', 'description', 'text', 'image', 'image_second', 'image_third', 'image_fourth', 'image_counter', 'video', 'age_restriction', 'copyright_text', 'copyright_link', 'created_at', 'created_by', 'start', 'active', 'editors_choice', 'public_choice', 'new_episode', 'archived', 'deleted', 'main_base_id'];
+    protected $fillable = ['article_broadcast_id', 'title', 'description', 'text', 'image', 'image_second', 'image_third', 'image_fourth', 'image_counter', 'video', 'age_restriction', 'copyright_text', 'copyright_link', 'created_at', 'created_by', 'start', 'active', 'editors_choice', 'public_choice', 'new_episode', 'archived', 'deleted', 'main_base_id', 'export_status'];
 
     protected $table = 'video';
 
     protected $primaryKey = 'video_id';
 
+    public $timestamps  = false;
 }
