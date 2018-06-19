@@ -22,6 +22,8 @@ return [
             'remove_after_36' => false,
             'last_edit_by' => 'API call',
             'created_by' => 0,
+            'seo_title' => "Заголовок",
+            'isnews' => 0,
             'images' => [
                 [
                     'id' => 0,

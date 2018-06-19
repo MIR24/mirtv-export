@@ -52,7 +52,7 @@ class ExportOneSerie extends Command
 
         $dry = $this->option("dry");
         $api24token = config("24api.params.token");
-        $newsCreatePoint = config("24api.url.news.create");
+        $newsCreatePoint = config("24api.url.episodes.create");
         $video = Video::find($this->argument("videoId"));
         $exportStatus = config("mirtv.24exportstatus");
 
@@ -168,8 +168,10 @@ class ExportOneSerie extends Command
         $newsData["advert"] = $video->description;
         $newsData["text"] = $video->text;
         if(!$dry) {
-            $newsData["images"][0]["id"] = $imageUploadResult["id"];
-            $newsData["images"][0]["src"] = $imageUploadResult["src"];
+            $imageMeta["id"] = $imageUploadResult["id"];
+            $imageMeta["src"] = $imageUploadResult["src"];
+            $imageMeta["remove_after"] = 0;
+            $newsData["images"][0] = $imageMeta;
             $newsData["crop_detail"]["id"] = $cropMarkedResult[0]["id"];
         }
 
