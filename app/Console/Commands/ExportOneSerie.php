@@ -17,7 +17,7 @@ class ExportOneSerie extends Command
      *
      * @var string
      */
-    protected $signature = '24export:oneserie {videoId : video.video_id} {--dry : Only log available data, do not perform actual import}';
+    protected $signature = '24export:oneserie {videoId : video.video_id} {--dry : Only log available data, do not perform actual export}';
 
     /**
      * The console command description.
@@ -167,6 +167,19 @@ class ExportOneSerie extends Command
         $newsData["title"] = $video->title;
         $newsData["advert"] = $video->description;
         $newsData["text"] = $video->text;
+
+        //Attach programm tag
+        $programmConnector = config("mirtv.24programm_connector");
+        if(array_key_exists($video->article_broadcast_id, $programmConnector)){
+            $tagProgramData[] = Array("id" => config("mirtv.24programm_connector")[$video->article_broadcast_id]["24tagid"]);
+            $this->info("Attach programm tag for " . config("mirtv.24programm_connector")[$video->article_broadcast_id]["title"] . " broadcast");
+        } else {
+            $this->error("Can't find broadcast connection for article_broadcast " . $video->article_broadcast_id);
+            return;
+        }
+
+        $newsData["tags_program"] = $tagProgramData;
+
         if(!$dry) {
             $imageMeta["id"] = $imageUploadResult["id"];
             $imageMeta["src"] = $imageUploadResult["src"];
