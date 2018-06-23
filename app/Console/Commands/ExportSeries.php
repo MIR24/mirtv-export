@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use App\Video;
 
 class ExportSeries extends Command
 {
@@ -11,7 +12,7 @@ class ExportSeries extends Command
      *
      * @var string
      */
-    protected $signature = '24export:series';
+    protected $signature = '24export:series {offset: video.video_id} {limit: video.video_id}';
 
     /**
      * The console command description.
@@ -37,6 +38,12 @@ class ExportSeries extends Command
      */
     public function handle()
     {
-        //
+        $exportStatus = config("mirtv.24exportstatus");
+
+        Video::where('export_status',$exportStatus["new"])->where('active',1)->where('archived', 0)->where('deleted',0)->chunk(200, function ($videos) {
+            foreach ($videos as $oneVideo) {
+                \Artisan::call('24export:oneserie',[ 'videoId' => $oneVideo->video_id]);
+            }
+        });
     }
 }
