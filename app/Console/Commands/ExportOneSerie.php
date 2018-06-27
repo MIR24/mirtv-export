@@ -63,9 +63,29 @@ class ExportOneSerie extends Command
             return;
         }
 
+        /*
+         *  Trying to attach programm tag
+         * ******************************/
+        $programmConnector = config("mirtv.24programm_connector");
+        if(array_key_exists($video->article_broadcast_id, $programmConnector)){
+            $tagProgramData[] = Array("id" => config("mirtv.24programm_connector")[$video->article_broadcast_id]["24tagid"]);
+            $this->info("Attach programm tag for " . config("mirtv.24programm_connector")[$video->article_broadcast_id]["title"] . " broadcast");
+            Log::info("Attach programm tag for " . config("mirtv.24programm_connector")[$video->article_broadcast_id]["title"] . " broadcast");
+        } else {
+            $this->error("Can't find broadcast connection for article_broadcast " . $video->article_broadcast_id);
+            Log::error("Can't find broadcast connection for article_broadcast " . $video->article_broadcast_id);
+            return;
+        }
+
         if(!$dry) $video->update(["export_status"=>$exportStatus["exporting"]]);
 
-        $videoFilePath = config("platformcraft.localvideopath") . $video->video_id . "/" . $video->video;
+        if($video->main_base_id > 0){
+            Log::info("Video file is hosted on remote server", [$video]);
+            $videoFilePath = config("platformcraft.24videopath") . $video->video;
+        } else {
+            Log::info("Video file is hosted on local server", [$video]);
+            $videoFilePath = config("platformcraft.localvideopath") . $video->video_id . "/" . $video->video;
+        }
         $imageFilePath = config("mirtv.localvideopath") . $video->video_id . "/" . $video->image;
 
         $platform = new Platform(
@@ -168,16 +188,6 @@ class ExportOneSerie extends Command
         $newsData["advert"] = $video->description;
         $newsData["text"] = $video->text;
 
-        //Attach programm tag
-        $programmConnector = config("mirtv.24programm_connector");
-        if(array_key_exists($video->article_broadcast_id, $programmConnector)){
-            $tagProgramData[] = Array("id" => config("mirtv.24programm_connector")[$video->article_broadcast_id]["24tagid"]);
-            $this->info("Attach programm tag for " . config("mirtv.24programm_connector")[$video->article_broadcast_id]["title"] . " broadcast");
-        } else {
-            $this->error("Can't find broadcast connection for article_broadcast " . $video->article_broadcast_id);
-            return;
-        }
-
         $newsData["tags_program"] = $tagProgramData;
 
         if(!$dry) {
@@ -189,6 +199,7 @@ class ExportOneSerie extends Command
         }
 
         $this->info("Creating news..");
+        Log::info("Creating news..");
         Log::debug("Creating news..", ["endpoint" => $newsCreatePoint, "payload" => $newsData]);
         if(!$dry) {
             $newsCreated = $client->request('POST', $newsCreatePoint, ["json"=>$newsData]);
