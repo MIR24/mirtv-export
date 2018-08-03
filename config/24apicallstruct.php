@@ -16,6 +16,8 @@ return [
                 'id' => 0,
                 'src' => '',
                 ],
+            'yandex_rss' => 0,
+            'yandex_zen' => 0,
             'title' => '',
             'advert' => '',
             'text' => '',

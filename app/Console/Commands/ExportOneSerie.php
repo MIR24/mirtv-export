@@ -53,6 +53,7 @@ class ExportOneSerie extends Command
         $dry = $this->option("dry");
         $api24token = config("24api.params.token");
         $newsCreatePoint = config("24api.url.episodes.create");
+        $videoPlayerCreatePoint = config("24api.url.videoplayer.create");
         $video = Video::find($this->argument("videoId"));
         $exportStatus = config("mirtv.24exportstatus");
 
@@ -102,7 +103,7 @@ class ExportOneSerie extends Command
         /*
          * Establish video player at Platformcraft CDN
          * *******************************************/
-        if(!$dry) $videoPlayer = $platform->setupVideoPlayer($videoFilePath);
+        if(!$dry) $videoPlayer = $platform->setupVideoPlayer(["auto"=>["path"=>$videoFilePath,"name"=>'']])["response"];
 
         if(!$dry && !$videoPlayer) {
             Log::error("Can't setup videoplayer", [$result,$platform::getMyError()]);
@@ -125,18 +126,20 @@ class ExportOneSerie extends Command
         $this->info("Setup screenshot..");
         if(!$dry) Log::debug("Setup screenshot..", $image);
 
-
         /*
          * Upload image to mir24 server
          * ****************************/
         $client = new Client();
-
         $imageData = [
             'multipart' =>
             [
                 [
                     'name'     => 'token',
                     'contents' => $api24token
+                ],
+                [
+                    'name'     => 'autocrop',
+                    'contents' => 1
                 ],
                 [
                     'name'     => 'original',
@@ -152,31 +155,19 @@ class ExportOneSerie extends Command
             Log::debug("Posted image to mir24..", $imageUploadResult);
         }
 
-
         /*
-         * Mark crop coordinates
-         * **********************/
-        $crop = array (
-            'detail_crop' =>
-            array (
-                'xCoord' => 0,
-                'yCoord' => 0,
-                'width' => config("24api.params.detail-image-width"),
-                'height' => config("24api.params.detail-image-height"),
-            ),
-            'token' => $api24token
-        );
-        if(!$dry) $patchUrl = config("24api.url.image.patch")."/".$imageUploadResult["id"];
-        else $patchUrl = config("24api.url.image.patch")."/"."1234567890";
-
-        $this->info("Patching image with crop params..");
-        Log::debug("Patching image with crop params..", ["patch-url"=>$patchUrl]);
-        if(!$dry) {
-            $cropMarked = $client->request('PATCH', $patchUrl, ["json"=>$crop]);
-            $cropMarkedResult = json_decode($cropMarked->getBody()->getContents(),1);
-            Log::debug("Mark detail crop", $cropMarkedResult);
-        }
-
+         * Post videoplayer to mir24
+         * */
+        $videoUploadRes = $platform->getVideoUploadedRes()[0];
+        Log::debug("Platformcraft uploaded video data", [$videoUploadRes]);
+        $videoPlayerData["video_id"] = $videoUploadRes['response']['object']['id'];
+        $videoPlayerData["id"] = $videoPlayer["player"]["id"];
+        $videoPlayerData["frame_tag"] = $videoPlayer["player"]["frame_tag"];
+        $videoPlayerData["token"] = $api24token;
+        Log::debug("POSTing player..", [$videoPlayerData]);
+        $playerCreated = $client->request('POST', $videoPlayerCreatePoint, ["json"=>$videoPlayerData]);
+        $playerCreatedData = json_decode($playerCreated->getBody()->getContents(),1);
+        Log::debug("Player POST result", [$playerCreatedData]);
 
         /*
          * Post publication to mir24
@@ -191,11 +182,8 @@ class ExportOneSerie extends Command
         $newsData["tags_program"] = $tagProgramData;
 
         if(!$dry) {
-            $imageMeta["id"] = $imageUploadResult["id"];
-            $imageMeta["src"] = $imageUploadResult["src"];
-            $imageMeta["remove_after"] = 0;
-            $newsData["images"][0] = $imageMeta;
-            $newsData["crop_detail"]["id"] = $cropMarkedResult[0]["id"];
+            $newsData["video"][0]["id"] = $playerCreatedData["id"];
+            $newsData["images"][0] = $imageUploadResult;
         }
 
         $this->info("Creating news..");

@@ -40,7 +40,7 @@ class ExportSeries extends Command
     {
         $exportStatus = config("mirtv.24exportstatus");
 
-        Video::where('export_status',$exportStatus["new"])->where('active',1)->where('archived', 0)->where('deleted',0)->where('main_base_id', 0)->chunk(200, function ($videos) {
+        Video::where('export_status',$exportStatus["new"])->where('active',1)->where('archived', 0)->where('deleted',0)->chunk(200, function ($videos) {
             foreach ($videos as $oneVideo) {
                 \Artisan::call('24export:oneserie',[ 'videoId' => $oneVideo->video_id]);
             }
