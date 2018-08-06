@@ -180,7 +180,7 @@ class ExportOneSerie extends Command
         $newsData["text"] = $video->text;
         $newsData["created_at"] = $video->created_at;
         $newsData["published_at"] = $video->start;
-
+        $newsData["isMIRchannel"] = config("mirtv.24programm_connector")[$video->article_broadcast_id]["isMIRchannel"];
         $newsData["tags_program"] = $tagProgramData;
 
         if(!$dry) {

@@ -6,15 +6,18 @@ return [
     "24programm_connector" => [
         63 => [
             "title" => "",
-            "24tagid" => 15361570
+            "24tagid" => 15361570,
+            "isMIRchannel" => 1,
         ],
         68 => [
             "title" => "",
-            "24tagid" => 15361572
+            "24tagid" => 15361572,
+            "isMIRchannel" => 1,
         ],
         205 => [
             "title" => "",
-            "24tagid" => 15361514
+            "24tagid" => 15361514,
+            "isMIRchannel" => 0,
         ],
     ]
 ];
