@@ -178,6 +178,8 @@ class ExportOneSerie extends Command
         $newsData["title"] = $video->title;
         $newsData["advert"] = $video->description;
         $newsData["text"] = $video->text;
+        $newsData["created_at"] = $video->created_at;
+        $newsData["published_at"] = $video->start;
 
         $newsData["tags_program"] = $tagProgramData;
 
