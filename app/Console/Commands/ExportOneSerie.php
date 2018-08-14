@@ -69,7 +69,8 @@ class ExportOneSerie extends Command
          * ******************************/
         $programmConnector = config("mirtv.24programm_connector");
         if(array_key_exists($video->article_broadcast_id, $programmConnector)){
-            $tagProgramData[] = Array("id" => config("mirtv.24programm_connector")[$video->article_broadcast_id]["24tagid"]);
+            $tagProgramData[] = Array("id" => config("mirtv.24programm_connector")[$video->article_broadcast_id]["programTagId"]);
+            $tagChannelData[] = Array("id" => config("mirtv.24programm_connector")[$video->article_broadcast_id]["channelTagId"]);
             $this->info("Attach programm tag for " . config("mirtv.24programm_connector")[$video->article_broadcast_id]["title"] . " broadcast");
             Log::info("Attach programm tag for " . config("mirtv.24programm_connector")[$video->article_broadcast_id]["title"] . " broadcast");
         } else {
@@ -181,8 +182,8 @@ class ExportOneSerie extends Command
         $newsData["created_at"] = $video->created_at;
         $newsData["published_at"] = $video->start;
         $newsData["teleshow_airtime"] = $video->start;
-        $newsData["isMIRchannel"] = config("mirtv.24programm_connector")[$video->article_broadcast_id]["isMIRchannel"];
         $newsData["tags_program"] = $tagProgramData;
+        $newsData["tags_channel"] = $tagChannelData;
 
         if(!$dry) {
             $newsData["video"][0]["id"] = $playerCreatedData["id"];
