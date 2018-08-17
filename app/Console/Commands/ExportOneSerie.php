@@ -196,6 +196,7 @@ class ExportOneSerie extends Command
         $newsData["tags_channel"] = $tagChannelData;
         $newsData["seo_title"] = $video->title;
         $newsData["tags_simple"] = $newsTags;
+        $newsData["age_restriction"] = $video->age_restriction;
 
         if(!$dry) {
             $newsData["video"][0]["id"] = $playerCreatedData["id"];
