@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use App\Jobs\ExportImage;
 use App\Video;
+use App\Tag;
 use \Barantaran\Platformcraft\Platform as Platform;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ServerException;
@@ -171,6 +172,15 @@ class ExportOneSerie extends Command
         Log::debug("Player POST result", [$playerCreatedData]);
 
         /*
+         * Attach tags
+         */
+
+        Log::debug("Found tags",[$video->tags]);
+        foreach($video->tags as $oneTag) {
+            $newsTags[] = $oneTag->name;
+        }
+
+        /*
          * Post publication to mir24
          * ****************************/
         $newsData = config("24apicallstruct.news.create");
@@ -185,6 +195,7 @@ class ExportOneSerie extends Command
         $newsData["tags_program"] = $tagProgramData;
         $newsData["tags_channel"] = $tagChannelData;
         $newsData["seo_title"] = $video->title;
+        $newsData["tags_simple"] = $newsTags;
 
         if(!$dry) {
             $newsData["video"][0]["id"] = $playerCreatedData["id"];

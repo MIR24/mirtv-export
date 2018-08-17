@@ -3,6 +3,7 @@
 namespace App;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Tag;
 
 /**
  * @property integer $video_id
@@ -42,4 +43,9 @@ class Video extends Model
     protected $primaryKey = 'video_id';
 
     public $timestamps  = false;
+
+    public function tags()
+    {
+          return $this->belongsToMany('App\Tag', 'video_tag_for_export', 'entity_id', 'tag_id');
+    }
 }
