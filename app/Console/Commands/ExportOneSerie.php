@@ -177,7 +177,7 @@ class ExportOneSerie extends Command
 
         Log::debug("Found tags",[$video->tags]);
         foreach($video->tags as $oneTag) {
-            $newsTags[] = $oneTag->name;
+            $newsTags[] = [ "title" => $oneTag->name ];
         }
 
         /*
@@ -191,11 +191,14 @@ class ExportOneSerie extends Command
         $newsData["text"] = $video->text;
         $newsData["created_at"] = $video->created_at;
         $newsData["published_at"] = $video->start;
+        $newsData["status"] = "active";
         $newsData["teleshow_airtime"] = $video->start;
         $newsData["tags_program"] = $tagProgramData;
         $newsData["tags_channel"] = $tagChannelData;
         $newsData["seo_title"] = $video->title;
         $newsData["tags_simple"] = $newsTags;
+        $newsData["tags_adjective"][] = [ "id" => 15361639 ];
+        $newsData["tags_super"][] = [ "id" => 15361643 ];
         $newsData["age_restriction"] = $video->age_restriction;
 
         if(!$dry) {

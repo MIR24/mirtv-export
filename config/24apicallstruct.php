@@ -40,15 +40,6 @@ return [
                     ]
                 ]
                 ],
-            'tags_super' => [
-                [
-                    'id' => 0,
-                    'title' => '',
-                    'type' => 0,
-                    'priority' => 1,
-                    'translateTitle' => ''
-                ]
-                ],
             'tags_geo' => [],
             'tags_service' => [],
             'tags_promo' => [],
