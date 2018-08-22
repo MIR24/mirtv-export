@@ -72,6 +72,8 @@ class ExportOneSerie extends Command
         if(array_key_exists($video->article_broadcast_id, $programmConnector)){
             $tagProgramData[] = Array("id" => config("mirtv.24programm_connector")[$video->article_broadcast_id]["programTagId"]);
             $tagChannelData[] = Array("id" => config("mirtv.24programm_connector")[$video->article_broadcast_id]["channelTagId"]);
+            $tagPremiumChannelData[] = Array("id" => config("mirtv")["premiumChannelTagId"]);
+            $premiumFlag = config("mirtv.24programm_connector")[$video->article_broadcast_id]["cloneIntoPremium"];
             $this->info("Attach programm tag for " . config("mirtv.24programm_connector")[$video->article_broadcast_id]["title"] . " broadcast");
             Log::info("Attach programm tag for " . config("mirtv.24programm_connector")[$video->article_broadcast_id]["title"] . " broadcast");
         } else {
@@ -216,6 +218,12 @@ class ExportOneSerie extends Command
             $newsCreateResult = json_decode($newsCreated->getBody()->getContents(),1);
             Log::debug("News created..", $newsCreateResult);
 
+            if($premiumFlag){
+                $newsData["tags_channel"] = $tagPremiumChannelData;
+                $newsCreated = $client->request('POST', $newsCreatePoint, ["json"=>$newsData]);
+                $newsCreateResult = json_decode($newsCreated->getBody()->getContents(),1);
+                Log::debug("Premium news created..", $newsCreateResult);
+            }
             $video->update(["export_status" => $exportStatus["done"]]);
         }
         $this->info("Done.");
