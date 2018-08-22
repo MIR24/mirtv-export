@@ -201,6 +201,8 @@ class ExportOneSerie extends Command
         if(!$dry) {
             $newsData["video"][0]["id"] = $playerCreatedData["id"];
             $newsData["images"][0] = $imageUploadResult;
+            $newsData["images"][0]["copyright"]["link"] = $video->copyright_link;
+            $newsData["images"][0]["copyright"]["origin"] = $video->copyright_text;
         }
 
         $this->info("Creating news..");
