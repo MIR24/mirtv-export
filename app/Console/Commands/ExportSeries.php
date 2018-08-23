@@ -12,7 +12,7 @@ class ExportSeries extends Command
      *
      * @var string
      */
-    protected $signature = '24export:series {offset : video.video_id} {limit : video.video_id}';
+    protected $signature = '24export:series {broadcastId: article_broadcast.article_id}';
 
     /**
      * The console command description.
@@ -39,8 +39,9 @@ class ExportSeries extends Command
     public function handle()
     {
         $exportStatus = config("mirtv.24exportstatus");
+        Log::info("Exporting show",["id"=>$this->argument("broadcastId")]);
 
-        Video::where('export_status',$exportStatus["new"])->where('active',1)->where('archived', 0)->where('deleted',0)->chunk(200, function ($videos) {
+        Video::where('export_status',$exportStatus["new"])->where('active',1)->where('archived', 0)->where('deleted',0)->where('article_broadcast_id',$this->argument("broadcastId"))->chunk(200, function ($videos) {
             foreach ($videos as $oneVideo) {
                 \Artisan::call('24export:oneserie',[ 'videoId' => $oneVideo->video_id]);
             }
