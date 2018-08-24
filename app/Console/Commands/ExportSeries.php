@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Video;
+use Illuminate\Support\Facades\Log;
 
 class ExportSeries extends Command
 {
@@ -12,7 +13,7 @@ class ExportSeries extends Command
      *
      * @var string
      */
-    protected $signature = '24export:series {broadcastId: article_broadcast.article_id}';
+    protected $signature = '24export:series {broadcastId : article_broadcast.article_id}';
 
     /**
      * The console command description.
