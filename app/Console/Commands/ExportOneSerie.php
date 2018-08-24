@@ -91,6 +91,8 @@ class ExportOneSerie extends Command
             Log::info("Video file is hosted on local server", [$video]);
             $videoFilePath = config("platformcraft.localvideopath") . $video->video_id . "/" . $video->video;
         }
+        $videoFileName = $this->formExtension($videoFilePath);
+
         $imageFilePath = config("mirtv.localvideopath") . $video->video_id . "/" . $video->image;
 
         $platform = new Platform(
@@ -107,10 +109,10 @@ class ExportOneSerie extends Command
         /*
          * Establish video player at Platformcraft CDN
          * *******************************************/
-        if(!$dry) $videoPlayer = $platform->setupVideoPlayer(["auto"=>["path"=>$videoFilePath,"name"=>'']])["response"];
+        if(!$dry) $videoPlayer = $platform->setupVideoPlayer(["auto"=>["path"=>$videoFilePath,"name"=>$videoFileName]])["response"];
 
         if(!$dry && !$videoPlayer) {
-            Log::error("Can't setup videoplayer", [$result,$platform::getMyError()]);
+            Log::error("Can't setup videoplayer", [$videoPlayer ,$platform->getMyError()]);
             exit;
         }
 
@@ -124,7 +126,8 @@ class ExportOneSerie extends Command
         if(!$dry) $image = $platform->attachImageToPlayer($imageFilePath, $videoPlayer["player"]["id"]);
 
         if(!$dry && !$image) {
-            Log::error("Can't attach image to videoplayer", [$result,$platform::getMyError()]);
+            Log::error("Can't attach image to videoplayer", [$result,$platform->getMyError()]);
+            Log::error("Last platform response", [$platform->getMyError()]);
             exit;
         }
         $this->info("Setup screenshot..");
@@ -227,5 +230,20 @@ class ExportOneSerie extends Command
             $video->update(["export_status" => $exportStatus["done"]]);
         }
         $this->info("Done.");
+    }
+
+    private function formExtension($filename, $ext="mp4")
+    {
+        echo "Passed filepath $filename\n";
+        $file_parts = pathinfo($filename);
+
+        if(empty($file_parts["extension"]))
+        {
+            $filenameFormed = basename($filename).".".$ext;
+            return $filenameFormed;
+        } else
+        {
+            return basename($filename);
+        }
     }
 }
