@@ -57,6 +57,7 @@ class ExportOneSerie extends Command
         $videoPlayerCreatePoint = config("24api.url.videoplayer.create");
         $video = Video::find($this->argument("videoId"));
         $exportStatus = config("mirtv.24exportstatus");
+        $client = new Client();
 
         if($dry) Log::info("Dry run..");
 
@@ -119,7 +120,6 @@ class ExportOneSerie extends Command
         $this->info("Setup videoplayer..");
         if(!$dry) Log::debug("Setup videoplayer..", $videoPlayer);
 
-
         /*
          * Attach image to player
          * ***********************/
@@ -136,31 +136,7 @@ class ExportOneSerie extends Command
         /*
          * Upload image to mir24 server
          * ****************************/
-        $client = new Client();
-        $imageData = [
-            'multipart' =>
-            [
-                [
-                    'name'     => 'token',
-                    'contents' => $api24token
-                ],
-                [
-                    'name'     => 'autocrop',
-                    'contents' => 1
-                ],
-                [
-                    'name'     => 'original',
-                    'contents' => fopen($imageFilePath, 'r')
-                ],
-            ]
-        ];
-        $this->info("Goin to post image to mir24..");
-        Log::debug("Goin to post image to mir24..", ["file"=>$imageFilePath, "data"=>$imageData]);
-        if(!$dry) {
-            $imageUploaded2Mir = $client->request('POST', config("24api.url.image.upload"), $imageData);
-            $imageUploadResult = json_decode($imageUploaded2Mir->getBody()->getContents(),1);
-            Log::debug("Posted image to mir24..", $imageUploadResult);
-        }
+        $imageUploadResult = $this->uploadImageTo24($imageFilePath, $api24token);
 
         /*
          * Post videoplayer to mir24
@@ -222,7 +198,11 @@ class ExportOneSerie extends Command
             Log::debug("News created..", $newsCreateResult);
 
             if($premiumFlag){
+                $imageUploadResult = $this->uploadImageTo24($imageFilePath, $api24token);
+                $newsData["images"][0] = $imageUploadResult;
+
                 $newsData["tags_channel"] = $tagPremiumChannelData;
+                $newsData["status"] = "inactive";
                 $newsCreated = $client->request('POST', $newsCreatePoint, ["json"=>$newsData]);
                 $newsCreateResult = json_decode($newsCreated->getBody()->getContents(),1);
                 Log::debug("Premium news created..", $newsCreateResult);
@@ -245,5 +225,41 @@ class ExportOneSerie extends Command
         {
             return basename($filename);
         }
+    }
+
+    /*
+     * Upload image to mir24 server
+     * ****************************/
+    private function uploadImageTo24($imageFilePath, $apiToken)
+    {
+        $client = new Client();
+
+        $imageData = [
+            'multipart' =>
+            [
+                [
+                    'name'     => 'token',
+                    'contents' => $apiToken
+                ],
+                [
+                    'name'     => 'autocrop',
+                    'contents' => 1
+                ],
+                [
+                    'name'     => 'original',
+                    'contents' => fopen($imageFilePath, 'r')
+                ],
+            ]
+        ];
+
+        $this->info("Goin to post image to mir24..");
+        Log::debug("Goin to post image to mir24..", ["file"=>$imageFilePath, "data"=>$imageData]);
+
+        $imageUploaded2Mir = $client->request('POST', config("24api.url.image.upload"), $imageData);
+        $imageUploadResult = json_decode($imageUploaded2Mir->getBody()->getContents(),1);
+
+        Log::debug("Posted image to mir24..", $imageUploadResult);
+
+        return $imageUploadResult;
     }
 }
