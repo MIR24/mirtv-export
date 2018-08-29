@@ -18,7 +18,7 @@ class ExportOneSerie extends Command
      *
      * @var string
      */
-    protected $signature = '24export:oneserie {videoId : video.video_id} {--dry : Only log available data, do not perform actual export}';
+    protected $signature = '24export:oneserie {videoId : video.video_id} {--dry : Only log available data, do not perform actual export} {--publish : Publish exported immediately}';
 
     /**
      * The console command description.
@@ -52,6 +52,7 @@ class ExportOneSerie extends Command
         Log::info("Exporting Serie",["id"=>$this->argument("videoId")]);
 
         $dry = $this->option("dry");
+        $publish = $this->option("publish");
         $api24token = config("24api.params.token");
         $newsCreatePoint = config("24api.url.episodes.create");
         $videoPlayerCreatePoint = config("24api.url.videoplayer.create");
@@ -166,13 +167,15 @@ class ExportOneSerie extends Command
          * ****************************/
         $newsData = config("24apicallstruct.news.create");
 
+        if($publish) $newsData["status"] = "active";
+        else $newsData["status"] = "inactive";
+
         $newsData["token"] = $api24token;
         $newsData["title"] = $video->title;
         $newsData["advert"] = $video->description;
         $newsData["text"] = $video->text;
         $newsData["created_at"] = $video->created_at;
         $newsData["published_at"] = $video->start;
-        $newsData["status"] = "active";
         $newsData["teleshow_airtime"] = $video->start;
         $newsData["tags_program"] = $tagProgramData;
         $newsData["tags_channel"] = $tagChannelData;
