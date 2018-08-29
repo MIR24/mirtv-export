@@ -53,6 +53,7 @@ class ExportOneSerie extends Command
 
         $dry = $this->option("dry");
         $publish = $this->option("publish");
+        Log::debug("Should be published:", ["publish"=>$publish]);
         $api24token = config("24api.params.token");
         $newsCreatePoint = config("24api.url.episodes.create");
         $videoPlayerCreatePoint = config("24api.url.videoplayer.create");
