@@ -203,6 +203,7 @@ class ExportOneSerie extends Command
         if(!$dry) {
             $newsCreated = $client->request('POST', $newsCreatePoint, ["json"=>$newsData]);
             $newsCreateResult = json_decode($newsCreated->getBody()->getContents(),1);
+            $newsCreateResult["mirtv_id"] = $video->video_id;
             Log::debug("News created..", $newsCreateResult);
 
             if($premiumFlag){
@@ -213,6 +214,7 @@ class ExportOneSerie extends Command
                 $newsData["status"] = "inactive";
                 $newsCreated = $client->request('POST', $newsCreatePoint, ["json"=>$newsData]);
                 $newsCreateResult = json_decode($newsCreated->getBody()->getContents(),1);
+                $newsCreateResult["mirtv_id"] = $video->video_id;
                 Log::debug("Premium news created..", $newsCreateResult);
             }
             $video->update(["export_status" => $exportStatus["done"]]);

@@ -3,8 +3,8 @@
 return [
     "url" => [
     "image" => [
-        "upload" => "https://editors17.mir24.tv/api/v1/images/upload",
-        "patch" => "https://editors17.mir24.tv/api/v1/images"
+        "upload" => "https://editors.mir24.tv/api/v1/images/upload",
+        "patch" => "https://editors.mir24.tv/api/v1/images"
         ],
     "news" => [
         "create" => "https://editors17.mir24.tv/api/v1/news/add/related",
