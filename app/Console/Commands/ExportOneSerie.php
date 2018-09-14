@@ -75,6 +75,8 @@ class ExportOneSerie extends Command
         if(array_key_exists($video->article_broadcast_id, $programmConnector)){
             $tagProgramData[] = Array("id" => config("mirtv.24programm_connector")[$video->article_broadcast_id]["programTagId"]);
             $tagChannelData[] = Array("id" => config("mirtv.24programm_connector")[$video->article_broadcast_id]["channelTagId"]);
+            $adjectiveTagData = Array("id" => config("mirtv.adjectiveTagId"));
+            $superTagData = Array("id" => config("mirtv.superTagId"));
             $tagPremiumChannelData[] = Array("id" => config("mirtv")["premiumChannelTagId"]);
             $premiumFlag = config("mirtv.24programm_connector")[$video->article_broadcast_id]["cloneIntoPremium"];
             $this->info("Attach programm tag for " . config("mirtv.24programm_connector")[$video->article_broadcast_id]["title"] . " broadcast");
@@ -90,8 +92,8 @@ class ExportOneSerie extends Command
         if($video->main_base_id > 0){
             Log::info("Video file is hosted on remote server", [$video]);
             $videoFilePath = config("platformcraft.24videopath") . $video->video;
-        } else {
-            Log::info("Video file is hosted on local server", [$video]);
+        } else {/*{*/
+            Log::info("Video file is hosted on local server", [$video]);/*}*/
             $videoFilePath = config("platformcraft.localvideopath") . $video->video_id . "/" . $video->video;
         }
         $videoFileName = $this->formExtension($videoFilePath);
@@ -181,9 +183,9 @@ class ExportOneSerie extends Command
         $newsData["tags_program"] = $tagProgramData;
         $newsData["tags_channel"] = $tagChannelData;
         $newsData["seo_title"] = $video->title;
-        $newsData["tags_simple"] = $newsTags;
-        $newsData["tags_adjective"][] = [ "id" => 15361639 ];
-        $newsData["tags_super"][] = [ "id" => 15361643 ];
+        if(!empty($newsTags))$newsData["tags_simple"] = $newsTags;
+        $newsData["tags_adjective"][] = $adjectiveTagData;
+        $newsData["tags_super"][] = $superTagData;
         $newsData["age_restriction"] = $video->age_restriction;
 
         if(!$dry) {
@@ -191,6 +193,8 @@ class ExportOneSerie extends Command
             $newsData["images"][0] = $imageUploadResult;
             $newsData["images"][0]["copyright"]["link"] = $video->copyright_link;
             $newsData["images"][0]["copyright"]["origin"] = $video->copyright_text;
+            $newsData["images"][0]["alt"] = $video->title;
+            $newsData["images"][0]["title"] = $video->title;
         }
 
         $this->info("Creating news..");
