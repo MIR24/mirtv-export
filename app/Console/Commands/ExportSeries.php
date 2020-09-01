@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
 use App\Video;
+use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
 class ExportSeries extends Command
@@ -43,53 +43,45 @@ class ExportSeries extends Command
         $maxLimit = $this->argument("maxLimit");
         $publish = $this->option("publish");
 
-        Log::debug("Exporting show",["id"=>$this->argument("broadcastId")]);
-        Log::debug("Max rows",["limit"=>$maxLimit]);
-        Log::debug("Published option got or not",["publish"=>$publish]);
+        Log::debug("Exporting show", ["id" => $this->argument("broadcastId")]);
+        Log::debug("Max rows", ["limit" => $maxLimit]);
+        Log::debug("Published option got or not", ["publish" => $publish]);
 
-        $lastId = Video::where('export_status',$exportStatus["new"])
-            ->where('active',1)
+        $queryBuilder = Video::where('export_status', $exportStatus["new"])
+            ->where('active', 1)
             ->where('archived', 0)
-            ->where('deleted',0)
-            ->where('article_broadcast_id',$this->argument("broadcastId"))
-            ->orderBy('video_id', 'desc')
+            ->where('deleted', 0)
+            ->where('article_broadcast_id', $this->argument("broadcastId"))
+            ->orderBy('video_id', 'desc');
+
+        $lastId = (clone $queryBuilder)
             ->skip($maxLimit)
             ->take(1)
             ->value('video_id');
 
-        Log::debug("Last id:",["lastId"=>$lastId]);
+        Log::debug("Last id:", ["lastId" => $lastId]);
 
-        if($maxLimit == 0){
+        if ($maxLimit == 0) {
             Log::debug("No limit passed, procedure all rows");
             $this->info("No limit passed, procedure all rows");
 
-            Video::where('export_status',$exportStatus["new"])
-                ->where('active',1)
-                ->where('archived', 0)
-                ->where('deleted',0)
-                ->where('article_broadcast_id',$this->argument("broadcastId"))
-                ->orderBy('video_id', 'desc')
-                ->chunk(200, function ($videos) use($publish) {
-                foreach ($videos as $oneVideo) {
-                    \Artisan::call('24export:oneserie',[ 'videoId' => $oneVideo->video_id, "--publish"=>$publish]);
-                }
-            });
-        } elseif(!$lastId){
+            (clone $queryBuilder)
+                ->chunk(200, function ($videos) use ($publish) {
+                    foreach ($videos as $oneVideo) {
+                        \Artisan::call('24export:oneserie', ['videoId' => $oneVideo->video_id, "--publish" => $publish]);
+                    }
+                });
+        } elseif (!$lastId) {
             Log::debug("No acceptable rows found or maxlimit is bigger than available quantity");
             $this->info("No acceptable rows found or maxlimit is bigger than available quantity, stop");
         } else {
-            Video::where('export_status',$exportStatus["new"])
-                ->where('active',1)
-                ->where('archived', 0)
-                ->where('deleted',0)
-                ->where('article_broadcast_id',$this->argument("broadcastId"))
+            (clone $queryBuilder)
                 ->where('video_id', '>', $lastId)
-                ->orderBy('video_id', 'desc')
-                ->chunk(200, function ($videos) use($publish) {
-                foreach ($videos as $oneVideo) {
-                    \Artisan::call('24export:oneserie',[ 'videoId' => $oneVideo->video_id, "--publish"=>$publish]);
-                }
-            });
+                ->chunk(200, function ($videos) use ($publish) {
+                    foreach ($videos as $oneVideo) {
+                        \Artisan::call('24export:oneserie', ['videoId' => $oneVideo->video_id, "--publish" => $publish]);
+                    }
+                });
         }
 
     }
