@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Video;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
 class ExportSeries extends Command
@@ -21,16 +22,6 @@ class ExportSeries extends Command
      * @var string
      */
     protected $description = 'Launches programm series export procedure from mirtv site into mir24';
-
-    /**
-     * Create a new command instance.
-     *
-     * @return void
-     */
-    public function __construct()
-    {
-        parent::__construct();
-    }
 
     /**
      * Execute the console command.
@@ -68,7 +59,7 @@ class ExportSeries extends Command
             (clone $queryBuilder)
                 ->chunk(200, function ($videos) use ($publish) {
                     foreach ($videos as $oneVideo) {
-                        \Artisan::call('24export:oneserie', ['videoId' => $oneVideo->video_id, "--publish" => $publish]);
+                        Artisan::call('24export:oneserie', ['videoId' => $oneVideo->video_id, "--publish" => $publish]);
                     }
                 });
         } elseif (!$lastId) {
@@ -79,7 +70,7 @@ class ExportSeries extends Command
                 ->where('video_id', '>', $lastId)
                 ->chunk(200, function ($videos) use ($publish) {
                     foreach ($videos as $oneVideo) {
-                        \Artisan::call('24export:oneserie', ['videoId' => $oneVideo->video_id, "--publish" => $publish]);
+                        Artisan::call('24export:oneserie', ['videoId' => $oneVideo->video_id, "--publish" => $publish]);
                     }
                 });
         }
