@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Components\SeriesExport\ExportStatusType;
-use App\Video;
-use Barantaran\Platformcraft\Platform as Platform;
+use App\Components\SeriesExport\ConfigDTO;
+use App\Components\SeriesExport\SeriesExportException;
+use App\Components\SeriesExport\SingleSerieExporter;
 use GuzzleHttp\Client;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -32,247 +32,32 @@ class ExportOneSerie extends Command
      */
     public function handle()
     {
-        /*
-         * Setup export procedure
-         * ***********************/
-        $this->info("Launch One Serie export..");
-        Log::debug("Launch One Serie export");
-        Log::info("Exporting Serie", ["id" => $this->argument("videoId")]);
+        try {
+            /*
+             * Setup export procedure
+             * ***********************/
+            $this->info("Launch One Serie export..");
+            Log::debug("Launch One Serie export");
+            Log::info("Exporting Serie", ["id" => $this->argument("videoId")]);
 
-        $dry = $this->option("dry");
-        $publish = $this->option("publish");
-        Log::debug("Should be published:", ["publish" => $publish]);
-        $api24token = config("24api.params.token");
-        $newsCreatePoint = config("24api.url.episodes.create");
-        $videoPlayerCreatePoint = config("24api.url.videoplayer.create");
-        $video = Video::find($this->argument("videoId"));
-        $client = new Client();
+            $dry = $this->option("dry");
+            $config = new ConfigDTO(
+                $this->option("publish"),
+                config("24api.params.token"),
+                config("24api.url.episodes.create"),
+                config("24api.url.videoplayer.create")
+            );
+            Log::debug("Should be published:", ["publish" => $config->publish]);
 
-        if ($dry) {
-            Log::info("Dry run..");
+            $client = new Client();
+            $programmConnector = config("mirtv.24programm_connector");
+
+            $exporter = new SingleSerieExporter($config, $dry, $this->argument("videoId"), $client, $programmConnector);
+            $exporter->export();
+
+            $this->info("Done.");
+        } catch (SeriesExportException $exception) {
+            $this->error($exception->getMessage());
         }
-
-        if (!$video) {
-            Log::error("Episode not found", [$video]);
-            return;
-        }
-
-        /*
-         *  Trying to attach programm tag
-         * ******************************/
-        $programmConnector = config("mirtv.24programm_connector");
-        if (array_key_exists($video->article_broadcast_id, $programmConnector)) {
-            $tagProgramData[] = array("id" => $programmConnector[$video->article_broadcast_id]["programTagId"]);
-            $tagChannelData[] = array("id" => $programmConnector[$video->article_broadcast_id]["channelTagId"]);
-            $adjectiveTagData = array("id" => config("mirtv.adjectiveTagId"));
-            $superTagData = array("id" => config("mirtv.superTagId"));
-            $tagPremiumChannelData[] = array("id" => config("mirtv")["premiumChannelTagId"]);
-            $premiumFlag = $programmConnector[$video->article_broadcast_id]["cloneIntoPremium"];
-            $this->info("Attach programm tag for " . $programmConnector[$video->article_broadcast_id]["title"] . " broadcast");
-            Log::info("Attach programm tag for " . $programmConnector[$video->article_broadcast_id]["title"] . " broadcast");
-        } else {
-            $this->error("Can't find broadcast connection for article_broadcast " . $video->article_broadcast_id);
-            Log::error("Can't find broadcast connection for article_broadcast " . $video->article_broadcast_id);
-            return;
-        }
-
-        if (!$dry) {
-            $video->update(["export_status" => ExportStatusType::EXPORTING]);
-        }
-
-        if ($video->main_base_id > 0) {
-            Log::info("Video file is hosted on remote server", [$video]);
-            $videoFilePath = config("platformcraft.24videopath") . $video->video;
-        } else {
-            Log::info("Video file is hosted on local server", [$video]);
-            $videoFilePath = config("platformcraft.localvideopath") . $video->video_id . "/" . $video->video;
-        }
-        $videoFileName = $this->formExtension($videoFilePath);
-
-        $imageFilePath = config("mirtv.localvideopath") . $video->video_id . "/" . $video->image;
-
-        $platform = new Platform(
-            config("platformcraft.apiuserid"),
-            config("platformcraft.hmackey")
-        );
-
-        if (!$platform) {
-            Log::error("Can't start platformcraft API", $platform);
-            exit;
-        }
-
-
-        /*
-         * Establish video player at Platformcraft CDN
-         * *******************************************/
-        $videoPlayer = null;
-        if (!$dry) {
-            $videoPlayer = $platform->setupVideoPlayer(["auto" => ["path" => $videoFilePath, "name" => $videoFileName]])["response"];
-        }
-
-        if (!$dry && !$videoPlayer) {
-            Log::error("Can't setup videoplayer", [$videoPlayer, $platform->getMyError()]);
-            exit;
-        }
-
-        $this->info("Setup videoplayer..");
-        if (!$dry) {
-            Log::debug("Setup videoplayer..", $videoPlayer);
-        }
-
-        /*
-         * Attach image to player
-         * ***********************/
-        $image = null;
-        if (!$dry) {
-            $image = $platform->attachImageToPlayer($imageFilePath, $videoPlayer["player"]["id"]);
-        }
-
-        if (!$dry && !$image) {
-            Log::error("Can't attach image to videoplayer");
-            Log::error("Last platform response", [$platform->getMyError()]);
-            exit;
-        }
-        $this->info("Setup screenshot..");
-        if (!$dry) {
-            Log::debug("Setup screenshot..", $image);
-        }
-
-        /*
-         * Upload image to mir24 server
-         * ****************************/
-        $imageUploadResult = $this->uploadImageTo24($imageFilePath, $api24token);
-
-        /*
-         * Post videoplayer to mir24
-         * */
-        $videoUploadRes = $platform->getVideoUploadedRes()[0];
-        Log::debug("Platformcraft uploaded video data", [$videoUploadRes]);
-        $videoPlayerData["video_id"] = $videoUploadRes['response']['object']['id'];
-        $videoPlayerData["id"] = $videoPlayer["player"]["id"];
-        $videoPlayerData["frame_tag"] = $videoPlayer["player"]["frame_tag"];
-        $videoPlayerData["token"] = $api24token;
-        Log::debug("POSTing player..", [$videoPlayerData]);
-        $playerCreated = $client->request('POST', $videoPlayerCreatePoint, ["json" => $videoPlayerData]);
-        $playerCreatedData = json_decode($playerCreated->getBody()->getContents(), 1);
-        Log::debug("Player POST result", [$playerCreatedData]);
-
-        /*
-         * Attach tags
-         */
-
-        Log::debug("Found tags", [$video->tags]);
-        foreach ($video->tags as $oneTag) {
-            $newsTags[] = ["title" => $oneTag->name];
-        }
-
-        /*
-         * Post publication to mir24
-         * ****************************/
-        $newsData = config("24apicallstruct.news.create");
-
-        if ($publish) {
-            $newsData["status"] = "active";
-        } else {
-            $newsData["status"] = "inactive";
-        }
-
-        $newsData["token"] = $api24token;
-        $newsData["title"] = $video->title;
-        $newsData["advert"] = $video->description;
-        $newsData["text"] = $video->text;
-        $newsData["created_at"] = $video->created_at;
-        $newsData["published_at"] = $video->start;
-        $newsData["teleshow_airtime"] = $video->start;
-        $newsData["tags_program"] = $tagProgramData;
-        $newsData["tags_channel"] = $tagChannelData;
-        $newsData["seo_title"] = $video->title;
-        if (!empty($newsTags)) {
-            $newsData["tags_simple"] = $newsTags;
-        }
-        $newsData["tags_adjective"][] = $adjectiveTagData;
-        $newsData["tags_super"][] = $superTagData;
-        $newsData["age_restriction"] = $video->age_restriction;
-
-        if (!$dry) {
-            $newsData["video"][0]["id"] = $playerCreatedData["id"];
-            $newsData["images"][0] = $imageUploadResult;
-            $newsData["images"][0]["copyright"]["link"] = $video->copyright_link;
-            $newsData["images"][0]["copyright"]["origin"] = $video->copyright_text;
-            $newsData["images"][0]["alt"] = $video->title;
-            $newsData["images"][0]["title"] = $video->title;
-        }
-
-        $this->info("Creating news..");
-        Log::info("Creating news..");
-        Log::debug("Creating news..", ["endpoint" => $newsCreatePoint, "payload" => $newsData]);
-        if (!$dry) {
-            $newsCreated = $client->request('POST', $newsCreatePoint, ["json" => $newsData]);
-            $newsCreateResult = json_decode($newsCreated->getBody()->getContents(), 1);
-            $newsCreateResult["mirtv_id"] = $video->video_id;
-            Log::debug("News created..", $newsCreateResult);
-
-            if ($premiumFlag) {
-                $imageUploadResult = $this->uploadImageTo24($imageFilePath, $api24token);
-                $newsData["images"][0] = $imageUploadResult;
-
-                $newsData["tags_channel"] = $tagPremiumChannelData;
-                $newsData["status"] = "inactive";
-                $newsCreated = $client->request('POST', $newsCreatePoint, ["json" => $newsData]);
-                $newsCreateResult = json_decode($newsCreated->getBody()->getContents(), 1);
-                $newsCreateResult["mirtv_id"] = $video->video_id;
-                Log::debug("Premium news created..", $newsCreateResult);
-            }
-            $video->update(["export_status" => ExportStatusType::DONE]);
-        }
-        $this->info("Done.");
-    }
-
-    private function formExtension($filename, $ext = "mp4")
-    {
-        echo "Passed filepath $filename\n";
-        $file_parts = pathinfo($filename);
-
-        if (empty($file_parts["extension"])) {
-            return basename($filename) . "." . $ext;
-        } else {
-            return basename($filename);
-        }
-    }
-
-    /*
-     * Upload image to mir24 server
-     * ****************************/
-    private function uploadImageTo24($imageFilePath, $apiToken)
-    {
-        $client = new Client();
-
-        $imageData = [
-            'multipart' =>
-                [
-                    [
-                        'name' => 'token',
-                        'contents' => $apiToken
-                    ],
-                    [
-                        'name' => 'autocrop',
-                        'contents' => 1
-                    ],
-                    [
-                        'name' => 'original',
-                        'contents' => fopen($imageFilePath, 'r')
-                    ],
-                ]
-        ];
-
-        $this->info("Goin to post image to mir24..");
-        Log::debug("Goin to post image to mir24..", ["file" => $imageFilePath, "data" => $imageData]);
-
-        $imageUploaded2Mir = $client->request('POST', config("24api.url.image.upload"), $imageData);
-        $imageUploadResult = json_decode($imageUploaded2Mir->getBody()->getContents(), 1);
-
-        Log::debug("Posted image to mir24..", $imageUploadResult);
-
-        return $imageUploadResult;
     }
 }
