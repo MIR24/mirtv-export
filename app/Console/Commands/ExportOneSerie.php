@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Components\SeriesExport\ExportStatusType;
 use App\Video;
 use Barantaran\Platformcraft\Platform as Platform;
 use GuzzleHttp\Client;
@@ -45,7 +46,6 @@ class ExportOneSerie extends Command
         $newsCreatePoint = config("24api.url.episodes.create");
         $videoPlayerCreatePoint = config("24api.url.videoplayer.create");
         $video = Video::find($this->argument("videoId"));
-        $exportStatus = config("mirtv.24exportstatus");
         $client = new Client();
 
         if ($dry) {
@@ -77,7 +77,7 @@ class ExportOneSerie extends Command
         }
 
         if (!$dry) {
-            $video->update(["export_status" => $exportStatus["exporting"]]);
+            $video->update(["export_status" => ExportStatusType::EXPORTING]);
         }
 
         if ($video->main_base_id > 0) {
@@ -223,7 +223,7 @@ class ExportOneSerie extends Command
                 $newsCreateResult["mirtv_id"] = $video->video_id;
                 Log::debug("Premium news created..", $newsCreateResult);
             }
-            $video->update(["export_status" => $exportStatus["done"]]);
+            $video->update(["export_status" => ExportStatusType::DONE]);
         }
         $this->info("Done.");
     }

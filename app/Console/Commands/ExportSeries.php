@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Components\SeriesExport\ExportStatusType;
 use App\Video;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
@@ -30,7 +31,6 @@ class ExportSeries extends Command
      */
     public function handle()
     {
-        $exportStatus = config("mirtv.24exportstatus");
         $maxLimit = $this->argument("maxLimit");
         $publish = $this->option("publish");
 
@@ -38,7 +38,7 @@ class ExportSeries extends Command
         Log::debug("Max rows", ["limit" => $maxLimit]);
         Log::debug("Published option got or not", ["publish" => $publish]);
 
-        $queryBuilder = Video::where('export_status', $exportStatus["new"])
+        $queryBuilder = Video::where('export_status', ExportStatusType::NEW)
             ->where('active', 1)
             ->where('archived', 0)
             ->where('deleted', 0)
