@@ -17,7 +17,9 @@ class SingleSerieExporter
     private $dry;
     private $videoId;
     /** @var Client */
-    private $client;
+    private $httpClient;
+    /** @var Platform */
+    private $platformClient;
     private $programmConnector;
 
     /**
@@ -33,7 +35,7 @@ class SingleSerieExporter
         $this->config = $config;
         $this->dry = $dry;
         $this->videoId = $videoId;
-        $this->client = $client;
+        $this->httpClient = $client;
         $this->programmConnector = $programmConnector;
     }
 
@@ -48,6 +50,32 @@ class SingleSerieExporter
             Log::info("Dry run..");
         }
 
+        $video = $this->loadVideoFromMirtv();
+
+        $imageFilePath = $this->calcImageFilePath($video);
+        $videoFilePath = $this->calcVideoFilePath($video);
+        $videoFileName = $this->calcVideoFileName($videoFilePath);
+
+        $this->platformClient = $this->createPlatformClient();
+
+        if (!$this->dry) {
+            $video->update(["export_status" => ExportStatusType::EXPORTING]);
+        }
+
+        # Save video to platformcraft
+        $videoPlayer = $this->setupVideoPlayer($videoFilePath, $videoFileName);
+        $this->attachImageToPlayer($imageFilePath, $videoPlayer);
+
+        $imageUploadResult = $this->uploadImageTo24($imageFilePath, $this->config->api24token);
+        $videoUploadResult = $this->uploadVideoTo24($videoPlayer);
+
+        $newsTags = $this->getNewsTags($video);
+        $newsData = $this->getNewsData($video, $imageUploadResult, $videoUploadResult, $newsTags);
+        $this->publishTODO($newsData, $imageFilePath, $video);
+    }
+
+    private function loadVideoFromMirtv(): Video
+    {
         $video = Video::find($this->videoId);
         if (!$video) {
             Log::error("Episode not found", [$video]);
@@ -56,37 +84,7 @@ class SingleSerieExporter
 
         $this->checkExistsArticleBroadcast($video);
 
-        if (!$this->dry) {
-            $video->update(["export_status" => ExportStatusType::EXPORTING]);
-        }
-
-        $videoFilePath = $this->getVideoFilePathTODO($video);
-        $videoFileName = $this->formExtension($videoFilePath);
-        $imageFilePath = config("mirtv.localvideopath") . $video->video_id . "/" . $video->image;
-        $platform = $this->getPlatformTODO();
-        $videoPlayer = $this->vidTODO($platform, $videoFilePath, $videoFileName);
-        $this->imgTODO($platform, $imageFilePath, $videoPlayer);
-        /*
-         * Upload image to mir24 server
-         * ****************************/
-        $imageUploadResult = $this->uploadImageTo24($imageFilePath, $this->config->api24token);
-
-        $videoPlayerData = $this->videoUploadResTODO($platform, $videoPlayer);
-        $playerCreated = $this->client->request('POST', $this->config->videoPlayerCreatePoint, ["json" => $videoPlayerData]);
-        $playerCreatedData = json_decode($playerCreated->getBody()->getContents(), 1);
-        Log::debug("Player POST result", [$playerCreatedData]);
-
-
-        /*
-         * Attach tags
-         */
-        Log::debug("Found tags", [$video->tags]);
-        $newsTags = [];
-        foreach ($video->tags as $oneTag) {
-            $newsTags[] = ["title" => $oneTag->name];
-        }
-        $newsData = $this->getNewsData($video, $imageUploadResult, $playerCreatedData, $newsTags);
-        $this->publishTODO($newsData, $imageFilePath, $video);
+        return $video;
     }
 
     /**
@@ -107,7 +105,12 @@ class SingleSerieExporter
         }
     }
 
-    private function getVideoFilePathTODO($video)
+    private function calcImageFilePath(Video $video): string
+    {
+        return config("mirtv.localvideopath") . $video->video_id . "/" . $video->image;
+    }
+
+    private function calcVideoFilePath(Video $video): string
     {
         if ($video->main_base_id > 0) {
             Log::info("Video file is hosted on remote server", [$video]);
@@ -119,9 +122,9 @@ class SingleSerieExporter
         return $videoFilePath;
     }
 
-    private function formExtension($filename, $ext = "mp4"): string
+    private function calcVideoFileName(string $filename, string $ext = "mp4"): string
     {
-        echo "Passed filepath $filename\n";
+        $this->info("Passed filepath $filename");
         $file_parts = pathinfo($filename);
 
         if (empty($file_parts["extension"])) {
@@ -135,7 +138,7 @@ class SingleSerieExporter
      * @return Platform
      * @throws SeriesExportException
      */
-    private function getPlatformTODO()
+    private function createPlatformClient(): Platform
     {
         $platform = new Platform(
             config("platformcraft.apiuserid"),
@@ -150,19 +153,19 @@ class SingleSerieExporter
         return $platform;
     }
 
-    private function vidTODO($platform, $videoFilePath, $videoFileName)
+    private function setupVideoPlayer($videoFilePath, $videoFileName)
     {
         /*
          * Establish video player at Platformcraft CDN
          * *******************************************/
         $videoPlayer = null;
         if (!$this->dry) {
-            $videoPlayer = $platform->setupVideoPlayer(["auto" => ["path" => $videoFilePath, "name" => $videoFileName]])["response"];
+            $videoPlayer = $this->platformClient->setupVideoPlayer(["auto" => ["path" => $videoFilePath, "name" => $videoFileName]])["response"];
         }
 
         if (!$this->dry && !$videoPlayer) {
-            Log::error("Can't setup videoplayer", [$videoPlayer, $platform->getMyError()]);
-            exit;
+//            Log::error("Can't setup videoplayer", [$videoPlayer, $platform->getMyError()]); # TODO protected
+            throw new SeriesExportException("Can't setup videoplayer");
         }
 
         $this->info("Setup videoplayer..");
@@ -174,30 +177,28 @@ class SingleSerieExporter
     }
 
     /**
-     * @param Platform $platform
      * @param $imageFilePath
      * @param $videoPlayer
      * @throws SeriesExportException
      */
-    private function imgTODO(Platform $platform, $imageFilePath, $videoPlayer)
+    private function attachImageToPlayer($imageFilePath, $videoPlayer)
     {
-        /*
-         * Attach image to player
-         * ***********************/
-        $image = null;
+        $isAttached = null;
         if (!$this->dry) {
-            $image = $platform->attachImageToPlayer($imageFilePath, $videoPlayer["player"]["id"]);
+            $isAttached = $this->platformClient->attachImageToPlayer($imageFilePath, $videoPlayer["player"]["id"]);
         }
 
-        if (!$this->dry && !$image) {
+        if (!$this->dry && !$isAttached) {
             Log::error("Can't attach image to videoplayer");
-//            Log::error("Last platform response", [$platform->getMyError()]); # TODO protected
+//            Log::error("Last platform response", [$this->platformClient->getMyError()]); # TODO protected
             throw new SeriesExportException("Can't attach image to videoplayer");
         }
         $this->info("Setup screenshot..");
         if (!$this->dry) {
-            Log::debug("Setup screenshot..", $image);
+            Log::debug("Setup screenshot..", $isAttached);
         }
+
+        return $isAttached;
     }
 
     /**
@@ -208,10 +209,6 @@ class SingleSerieExporter
      */
     private function uploadImageTo24($imageFilePath, $apiToken)
     {
-        /*
- * Upload image to mir24 server
- * ****************************/
-
         $imageData = [
             'multipart' =>
                 [
@@ -233,27 +230,41 @@ class SingleSerieExporter
         $this->info("Goin to post image to mir24..");
         Log::debug("Goin to post image to mir24..", ["file" => $imageFilePath, "data" => $imageData]);
 
-        $imageUploaded2Mir = $this->client->request('POST', config("24api.url.image.upload"), $imageData);
-        $imageUploadResult = json_decode($imageUploaded2Mir->getBody()->getContents(), 1);
+        $imageUploaded24Mir = $this->httpClient->request('POST', config("24api.url.image.upload"), $imageData);
+        $imageUploadResult = json_decode($imageUploaded24Mir->getBody()->getContents(), 1);
 
         Log::debug("Posted image to mir24..", $imageUploadResult);
 
         return $imageUploadResult;
     }
 
-    private function videoUploadResTODO($platform, $videoPlayer)
+    private function uploadVideoTo24($videoPlayer)
     {
-        /*
- * Post videoplayer to mir24
- * */
-        $videoUploadRes = $platform->getVideoUploadedRes()[0];
+        $videoUploadRes = $this->platformClient->getVideoUploadedRes()[0];
         Log::debug("Platformcraft uploaded video data", [$videoUploadRes]);
         $videoPlayerData["video_id"] = $videoUploadRes['response']['object']['id'];
         $videoPlayerData["id"] = $videoPlayer["player"]["id"];
         $videoPlayerData["frame_tag"] = $videoPlayer["player"]["frame_tag"];
         $videoPlayerData["token"] = $this->config->api24token;
         Log::debug("POSTing player..", [$videoPlayerData]);
-        return $videoPlayerData;
+
+        $playerCreated = $this->httpClient->request('POST', $this->config->videoPlayerCreatePoint, ["json" => $videoPlayerData]);
+
+        $playerCreatedData = json_decode($playerCreated->getBody()->getContents(), 1);
+        Log::debug("Player POST result", [$playerCreatedData]);
+
+        return $playerCreatedData;
+    }
+
+    private function getNewsTags(Video $video)
+    {
+        Log::debug("Found tags", [$video->tags]);
+        $newsTags = [];
+        foreach ($video->tags as $oneTag) {
+            $newsTags[] = ["title" => $oneTag->name];
+        }
+
+        return $newsTags;
     }
 
     private function getNewsData($video, $imageUploadResult, $playerCreatedData, $newsTags)
@@ -313,9 +324,7 @@ class SingleSerieExporter
         Log::info($messageCreate);
         Log::debug($messageCreate, ["endpoint" => $this->config->newsCreatePoint, "payload" => $newsData]);
         if (!$this->dry) {
-            $newsCreated = $this->client->request('POST', $this->config->newsCreatePoint, ["json" => $newsData]);
-            $newsCreateResult = json_decode($newsCreated->getBody()->getContents(), 1);
-            $newsCreateResult["mirtv_id"] = $video->video_id;
+            $newsCreateResult = $this->createNews($newsData, $video);
             Log::debug("News created..", $newsCreateResult);
 
             $tagPremiumChannelData[] = array("id" => config("mirtv")["premiumChannelTagId"]);
@@ -326,13 +335,20 @@ class SingleSerieExporter
 
                 $newsData["tags_channel"] = $tagPremiumChannelData;
                 $newsData["status"] = "inactive";
-                $newsCreated = $this->client->request('POST', $this->config->newsCreatePoint, ["json" => $newsData]);
-                $newsCreateResult = json_decode($newsCreated->getBody()->getContents(), 1);
-                $newsCreateResult["mirtv_id"] = $video->video_id;
+                $newsCreateResult = $this->createNews($newsData, $video);
                 Log::debug("Premium news created..", $newsCreateResult);
             }
             $video->update(["export_status" => ExportStatusType::DONE]);
         }
+    }
+
+    private function createNews($newsData, $video)
+    {
+        $newsCreated = $this->httpClient->request('POST', $this->config->newsCreatePoint, ["json" => $newsData]);
+        $newsCreateResult = json_decode($newsCreated->getBody()->getContents(), 1);
+        $newsCreateResult["mirtv_id"] = $video->video_id;
+
+        return $newsCreateResult;
     }
 
     private function info($message)
